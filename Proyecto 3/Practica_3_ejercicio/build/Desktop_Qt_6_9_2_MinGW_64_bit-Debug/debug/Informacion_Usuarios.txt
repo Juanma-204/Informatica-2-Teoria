@@ -1,3 +1,0 @@
-Administrador,Juanma,Contraceña,1025
-Administrador,Pablo,Contraceña,555555
-Usuarrio,Josedavid,Contraceña,123

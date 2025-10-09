@@ -12,7 +12,7 @@ const char INPUT_FILE[] = "Informacion_Usuarios_c.txt";
 const char TRANS_FILE[] = "transacciones.txt";
 const int COSTO_OPERACION = 1000;
 
-// ---------- UTILIDADES BINARIO <-> TEXTO (C-style) ----------
+// ---------- UTILIDADES BINARIO <-> TEXTO ----------
 // Comprueba si una cadena contiene solo '0' y '1'
 bool esBinario(const char* s) {
     if (!s) return false;
@@ -70,7 +70,8 @@ int splitCommaAlloc(const char* linea, char** tokens, int maxTokens) {
     strcpy(buf, linea);
 
     int count = 0;
-    char* start = buf;
+    char* cur = buf;
+    char* start = cur;
     for (int i = 0; ; i++) {
         if (buf[i] == ',' || buf[i] == '\0') {
             buf[i] = '\0';
@@ -168,16 +169,22 @@ void cargarUsuariosDesdeArchivo() {
         for (int t = 0; t < 10; t++) tokens[t] = NULL;
         int nTok = splitCommaAlloc(linea, tokens, 10);
 
-        // interpretar: convertir tokens que son binarios (campos codificados) a texto
+        // interpretamos: tokens pueden mezclar texto plano y campos binarios
+        // convertir tokens que son binarios (múltiplos de 8, solo 0/1) a texto
         for (int t = 0; t < nTok; t++) {
             if (esBinario(tokens[t])) {
                 char* dec = binToText(tokens[t]);
                 delete[] tokens[t];
                 tokens[t] = dec;
             }
+            // si no es binario, lo dejamos tal cual (ej: "Administrador", "saldo")
         }
 
-        // Interpretamos esquema: tokens[0] es el rol (Administrador/Usuario)
+        // Ahora interpretamos esquema práctico (según tus ejemplos):
+        // Puede ser:
+        // Administrador, <name>, Contracena, <pass>
+        // Usuario, <name>, Contracena, <pass>, saldo, <saldo>
+        // General: buscar "Administrador" o "Usuario" en tokens[0]
         if (nTok >= 4 && strcmp(tokens[0], "Administrador") == 0) {
             const char* nombre = tokens[1];
             const char* contr = tokens[3];
@@ -186,11 +193,11 @@ void cargarUsuariosDesdeArchivo() {
             const char* nombre = tokens[1];
             const char* contr = tokens[3];
             long s = 0;
-            // tokens[5] debe ser el saldo (decodificado a texto y luego a numero)
+            // tokens[4] is "saldo" maybe, tokens[5] numeric
             if (nTok >= 6) s = atol(tokens[5]);
             addUserMemory("Usuario", nombre, contr, s);
         } else {
-            // Intento de parseo por posición por defecto si el rol no es claro
+            // comportamiento por defecto: intentar parsear por posición
             if (nTok >= 4) {
                 const char* nombre = tokens[1];
                 const char* contr = tokens[3];
@@ -207,8 +214,13 @@ void cargarUsuariosDesdeArchivo() {
 }
 
 // ---------- GUARDAR NUEVO USUARIO EN ARCHIVO CODIFICADO ----------
-// Construimos la línea, codificamos los campos necesarios y la añadimos (Punto 1)
+// Construimos la línea (texto legible), la convertimos a binario por campos según formato original y la añadimos
 void appendUserToEncodedFile(const char* rol, const char* nombre, const char* contrasena, long saldo) {
+    // Formato a crear:
+    // si Administrador:
+    // Administrador,<bin(name)>,Contracena,<bin(pass)>
+    // si Usuario:
+    // Usuario,<bin(name)>,Contracena,<bin(pass)>,saldo,<saldo>
     char* binName = textToBin(nombre);
     char* binPass = textToBin(contrasena);
 
@@ -220,16 +232,12 @@ void appendUserToEncodedFile(const char* rol, const char* nombre, const char* co
         return;
     }
 
-    // El archivo de salida mantiene los campos codificados en binario (binName, binPass)
     if (strcmp(rol, "Administrador") == 0) {
         fout << "Administrador," << binName << ",Contracena," << binPass << "\n";
     } else {
-        // El saldo se codifica a texto primero (numBuf) y luego se escribe
+        // escribir saldo en texto normal (no bin) para mantener compatibilidad como en tu ejemplo
         char numBuf[64];
         sprintf(numBuf, "%ld", saldo);
-
-        // (Nota: si el saldo se debe codificar, aquí iría char* binSaldo = textToBin(numBuf);
-        // Mantengo el saldo en texto (numBuf) ya que parece ser el formato de tu archivo de ejemplo original)
         fout << "Usuario," << binName << ",Contracena," << binPass << ",saldo," << numBuf << "\n";
     }
 
@@ -239,14 +247,13 @@ void appendUserToEncodedFile(const char* rol, const char* nombre, const char* co
 }
 
 // ---------- REGISTRO DE TRANSACCIONES (CODIFICADO) ----------
-// Todas las transacciones deben registrarse y codificarse (Punto 2)
 void registrarTransaccionCodificada(const char* usuario, const char* operacion, long valor, long costo, long nuevoSaldo) {
-    // crear linea legible de transaccion
+    // crear linea legible primero
     char linea[512];
     sprintf(linea, "Usuario:%s | Operacion:%s | Valor:%ld | Costo:%ld | Nuevo saldo:%ld",
             usuario, operacion, valor, costo, nuevoSaldo);
 
-    // codificar toda la línea de transacción en binario ASCII
+    // codificar linea en binario ASCII
     char* bin = textToBin(linea);
     if (!bin) return;
 
@@ -273,18 +280,8 @@ void menuAdministradorInteractive(const char* adminName) {
         cout << "Seleccione opcion: ";
         int op;
         cin >> op;
-
-        // ******************* CORRECCION DE SEGURIDAD (cin) *******************
-        if (cin.fail()) {
-            cin.clear();
-            cin.ignore(MAX_LINE, '\n');
-            cout << "Entrada invalida. Ingrese un numero.\n";
-            continue;
-        }
-        // *********************************************************************
-
         if (op == 1) {
-            cout << "\nLista de usuarios (Decodificada):\n";
+            cout << "\nLista de usuarios:\n";
             for (int i = 0; i < userCount; i++) {
                 cout << " - Rol: " << rolArr[i] << " | Nombre: " << nameArr[i];
                 if (strcmp(rolArr[i], "Usuario") == 0) {
@@ -307,20 +304,11 @@ void menuAdministradorInteractive(const char* adminName) {
             if (strcmp(rolIn, "Usuario") == 0) {
                 cout << "Ingrese saldo inicial (numero): ";
                 cin >> saldoIn;
-
-                // ******************* CORRECCION DE SEGURIDAD (cin) *******************
-                if (cin.fail()) {
-                    cin.clear();
-                    cin.ignore(MAX_LINE, '\n');
-                    cout << "Saldo invalido. Cancelando registro.\n";
-                    continue;
-                }
-                // *********************************************************************
             }
-            // agregar en memoria y en archivo codificado (Punto 1)
+            // agregar en memoria y en archivo codificado
             addUserMemory(rolIn, nombreIn, passIn, saldoIn);
             appendUserToEncodedFile(rolIn, nombreIn, passIn, saldoIn);
-            cout << "Usuario agregado (registrado y codificado).\n";
+            cout << "Usuario agregado.\n";
         } else {
             break;
         }
@@ -339,41 +327,20 @@ void menuUsuarioInteractive(const char* username, int idxUser) {
         cout << "Seleccione opcion: ";
         int op;
         cin >> op;
-
-        // ******************* CORRECCION DE SEGURIDAD (cin) *******************
-        if (cin.fail()) {
-            cin.clear();
-            cin.ignore(MAX_LINE, '\n');
-            cout << "Entrada invalida. Ingrese un numero.\n";
-            continue;
-        }
-        // *********************************************************************
-
         if (op == 1) {
-            // Consultar saldo tiene costo de 1000 COP (Punto 2)
+            // descontar costo
             if (saldo < COSTO_OPERACION) {
-                cout << "No hay dinero suficiente para pagar el costo de consulta (" << COSTO_OPERACION << ").\n";
+                cout << "No hay dinero suficiente para pagar el costo de ingreso (" << COSTO_OPERACION << ").\n";
             } else {
                 saldo -= COSTO_OPERACION;
                 saldoArr[idxUser] = saldo;
-                cout << "Costo aplicado. Saldo actual: " << saldo << "\n";
+                cout << "Saldo despues de costo: " << saldo << "\n";
                 registrarTransaccionCodificada(username, "Consulta", 0, COSTO_OPERACION, saldo);
             }
         } else if (op == 2) {
             long valor;
             cout << "Ingrese cantidad a retirar: ";
             cin >> valor;
-
-            // ******************* CORRECCION DE SEGURIDAD (cin) *******************
-            if (cin.fail()) {
-                cin.clear();
-                cin.ignore(MAX_LINE, '\n');
-                cout << "Cantidad invalida.\n";
-                continue;
-            }
-            // *********************************************************************
-
-            // Retirar dinero tiene costo de 1000 COP (Punto 2)
             long total = valor + COSTO_OPERACION;
             if (valor <= 0) {
                 cout << "Valor invalido.\n";
@@ -382,7 +349,7 @@ void menuUsuarioInteractive(const char* username, int idxUser) {
             } else {
                 saldo -= total;
                 saldoArr[idxUser] = saldo;
-                cout << "Retiro exitoso. Costo aplicado. Nuevo saldo: " << saldo << "\n";
+                cout << "Retiro exitoso. Nuevo saldo: " << saldo << "\n";
                 registrarTransaccionCodificada(username, "Retiro", valor, COSTO_OPERACION, saldo);
             }
         } else {
@@ -396,7 +363,7 @@ int main() {
     cout << "Iniciando sistema bancario (leer " << INPUT_FILE << ")...\n";
     cargarUsuariosDesdeArchivo();
     if (userCount == 0) {
-        cout << "No hay usuarios cargados. Revise " << INPUT_FILE << " (debe estar codificado).\n";
+        cout << "No hay usuarios cargados. Revise " << INPUT_FILE << " o agregue entradas codificadas.\n";
     }
 
     while (1) {
@@ -406,16 +373,6 @@ int main() {
         cout << "Seleccione opcion: ";
         int op;
         cin >> op;
-
-        // ******************* CORRECCION DE SEGURIDAD (cin) *******************
-        if (cin.fail()) {
-            cin.clear();
-            cin.ignore(MAX_LINE, '\n');
-            cout << "Entrada invalida. Ingrese un numero.\n";
-            continue;
-        }
-        // *********************************************************************
-
         if (op == 2) break;
         if (op != 1) continue;
 
@@ -430,8 +387,6 @@ int main() {
             cout << "Usuario no encontrado.\n";
             continue;
         }
-
-        // Validacion de acceso contra el archivo DECODIFICADO en memoria (Punto 1)
         if (strcmp(passArr[idx], passIn) != 0) {
             cout << "Contrasena incorrecta.\n";
             continue;
@@ -447,6 +402,8 @@ int main() {
         }
     }
 
+    // antes de salir, actualizar el archivo de usuarios no es necesario porque
+    // agregamos en el archivo cada vez que el admin añade un usuario.
     freeAllUsers();
     cout << "Saliendo. Gracias por usar el sistema.\n";
     return 0;

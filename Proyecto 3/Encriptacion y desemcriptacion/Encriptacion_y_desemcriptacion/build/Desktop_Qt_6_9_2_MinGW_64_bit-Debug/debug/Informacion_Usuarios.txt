@@ -1,0 +1,5 @@
+Administrador,Juanma,Contracena,1025
+Administrador,Pablo,Contracena,555555
+Usuario,Josedavid,Contracena,9078,saldo,100000
+Usuario,Pedro,Contracena,66666,saldo,75000
+Usuario,Pablo,Contracena,111111,saldo,45000

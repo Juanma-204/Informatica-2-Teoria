@@ -1,0 +1,5 @@
+Administrador,í]Xõ[X,Contrasena,LåM
+Administrador,Xò€,Contrasena,MMMMMM
+Usuario,í€‹YXùZ,Contrasena,NÕ,saldo,100000
+Usuario,Yú€,Contrasena,ççççç,saldo,75000
+Usuario,Xò€,Contrasena,LLLLLL,saldo,45000

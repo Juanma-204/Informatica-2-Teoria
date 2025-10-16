@@ -1,0 +1,5 @@
+Administrador,Juanma,Contrasena,1025,Cedula,1025880778,Saldo,0
+Administrador,Paola,Contrasena,555555,Cedula,5555555555,Saldo,0
+Usuario,Josedavid,Contrasena,123,Cedula,10101010,Saldo,100000
+Usuario,Juanma,Contrasena,9078,Cedula,222222,Saldo,75000
+Usuario,Pablo,Contrasena,09090,Cedula,909090,Saldo,45000
